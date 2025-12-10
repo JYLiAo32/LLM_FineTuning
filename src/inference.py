@@ -3,7 +3,7 @@ import torch
 from transformers import TextStreamer
 from unsloth import FastLanguageModel
 from utils.color_print import colored_print, color_text
-from utils.config import GlobalConfig, PromptConfig
+from utils.config import InferenceConfig, PromptConfig
 
 
 
@@ -33,16 +33,16 @@ def generate_text(model, tokenizer, prompt_text: str, max_new_tokens: int, tempe
 
 
 def build_prompt(instruction: str, input_text: str = ""):
-    return PromptConfig.alpaca_prompt.format(instruction=instruction, input=input_text, output="")
+    return PromptConfig.alpaca_prompt_domain_special2.format(instruction=instruction, output="")
 
 def load_model(lora_path: str, device: str="cuda"):
     colored_print(f"[INFO] Loading model from: {lora_path}", color="note")
     try:
         model, tokenizer = FastLanguageModel.from_pretrained(
             model_name = lora_path, 
-            max_seq_length = GlobalConfig.max_seq_length,
-            dtype = GlobalConfig.dtype,
-            load_in_4bit = GlobalConfig.load_in_4bit,
+            max_seq_length = InferenceConfig.max_seq_length,
+            dtype = InferenceConfig.dtype,
+            load_in_4bit = InferenceConfig.load_in_4bit,
         )
         model.to(device)
         colored_print("[INFO] Model loaded successfully.", color="note")
@@ -67,9 +67,9 @@ def chat(model, tokenizer):
         inpt = args.input
         prompt = build_prompt(instr, inpt)
         out = generate_text(model, tokenizer, prompt, 
-                            GlobalConfig.DEFAULT_MAX_NEW_TOKENS, 
-                            GlobalConfig.DEFAULT_TEMPERATURE, 
-                            GlobalConfig.DEFAULT_TOP_P, 
+                            InferenceConfig.DEFAULT_MAX_NEW_TOKENS, 
+                            InferenceConfig.DEFAULT_TEMPERATURE, 
+                            InferenceConfig.DEFAULT_TOP_P, 
                             device=args.device, stream=False)
         colored_print(f"Ouput:", color="note")
         print(out)
@@ -78,13 +78,14 @@ def chat(model, tokenizer):
         try:
             while True:
                 q = input(color_text("note", "Enter instruction: ")).strip()
-                inp = input(color_text("note", "Enter input (optional, press Enter to skip): ")).strip()
+                # inp = input(color_text("note", "Enter input (optional, press Enter to skip): ")).strip()
+                inp=""  # NOTE: 不使用input字段
                 prompt = build_prompt(q, inp)
                 colored_print(f"Ouput:", color="note")
                 generate_text(model, tokenizer, prompt, 
-                              GlobalConfig.DEFAULT_MAX_NEW_TOKENS, 
-                              GlobalConfig.DEFAULT_TEMPERATURE, 
-                              GlobalConfig.DEFAULT_TOP_P, 
+                              InferenceConfig.DEFAULT_MAX_NEW_TOKENS, 
+                              InferenceConfig.DEFAULT_TEMPERATURE, 
+                              InferenceConfig.DEFAULT_TOP_P, 
                               device=args.device, stream=True)
         except KeyboardInterrupt:
             colored_print("\n[INFO] Chat end", color="note")
@@ -107,11 +108,11 @@ if __name__ == "__main__":
     
     # 如果提供了命令行参数，则覆盖配置
     if args.max_new_tokens:
-        GlobalConfig.DEFAULT_MAX_NEW_TOKENS = args.max_new_tokens
+        InferenceConfig.DEFAULT_MAX_NEW_TOKENS = args.max_new_tokens
     if args.temperature:
-        GlobalConfig.DEFAULT_TEMPERATURE = args.temperature
+        InferenceConfig.DEFAULT_TEMPERATURE = args.temperature
     if args.top_p:
-        GlobalConfig.DEFAULT_TOP_P = args.top_p
+        InferenceConfig.DEFAULT_TOP_P = args.top_p
     
     args.device = "cuda" if torch.cuda.is_available() else "cpu"
     colored_print(f"Using device: {args.device}", color="note")

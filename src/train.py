@@ -4,8 +4,10 @@ from datasets import load_dataset
 from trl import SFTTrainer
 from transformers import TrainingArguments
 from unsloth import is_bfloat16_supported
-from utils.config import SFTConfig, PromptConfig, GlobalConfig
+from utils.config import SFTConfig, PromptConfig, GlobalConfig, ModelConfig
 from utils.color_print import colored_print
+import json
+import os
 
 
 def load_base_model():
@@ -35,15 +37,14 @@ def prepare_lora_model(model):
     try:
         model = FastLanguageModel.get_peft_model(
             model,
-            r=16,  # Choose any number > 0 ! Suggested 8, 16, 32, 64, 128
-            target_modules=["q_proj", "k_proj", "v_proj", "o_proj",
-                          "gate_proj", "up_proj", "down_proj",],
-            lora_alpha=16,
-            lora_dropout=0,  # Supports any, but = 0 is optimized
-            bias="none",    # Supports any, but = "none" is optimized
+            r=ModelConfig.lora_r,  
+            target_modules=ModelConfig.target_modules,
+            lora_alpha=ModelConfig.lora_alpha,
+            lora_dropout=ModelConfig.lora_dropout,  
+            bias=ModelConfig.bias,    
             # [NEW] "unsloth" uses 30% less VRAM, fits 2x larger batch sizes!
             use_gradient_checkpointing="unsloth",  # True or "unsloth" for very long context
-            random_state=SFTConfig.seed,
+            random_state=GlobalConfig.seed,
             use_rslora=False,  # We support rank stabilized LoRA
             loftq_config=None,  # And LoftQ
         )
@@ -54,15 +55,13 @@ def prepare_lora_model(model):
         exit(1)
 
 
-def prepare_dataset(tokenizer):
+def prepare_dataset(tokenizer, dataset_path: str):
     """
     prepare dataset for training
     """
-    # TODO: 自主构建垂直领域数据集
-    colored_print("[INFO] Preparing dataset...", color="note")
+    colored_print(f"[INFO] Preparing dataset from: {dataset_path}...", color="note")
     
-    # Alpaca提示模板
-    prompt_template = PromptConfig.alpaca_prompt
+    prompt_template = PromptConfig.alpaca_prompt_domain_special2
 
     EOS_TOKEN = tokenizer.eos_token  # Must add EOS_TOKEN
     
@@ -73,19 +72,20 @@ def prepare_dataset(tokenizer):
         texts = []
         for instruction, input, output in zip(instructions, inputs, outputs):
             # Must add EOS_TOKEN, otherwise your generation will go on forever!
-            text = prompt_template.format(instruction=instruction, input=input, output=output) + EOS_TOKEN
+            # text = prompt_template.format(instruction=instruction, input=input, output=output) + EOS_TOKEN
+            text = prompt_template.format(instruction=instruction, output=output) + EOS_TOKEN
             texts.append(text)
         return { "text": texts, }
 
     try:
-        # FIXME: 暂时使用通用数据集，后续需要替换为垂直领域数据集
-        dataset = load_dataset("yahma/alpaca-cleaned", split="train")
+        dataset = load_dataset(dataset_path, split="train")
+        # dataset, dataset_val  = load_dataset(dataset_path)  # TODO: 如何使用验证集
         dataset = dataset.map(formatting_prompts_func, batched=True,)
-        colored_print(f"[INFO] Dataset prepared successfully. Size: {len(dataset)}", color="note")
+        colored_print(f"[INFO] Dataset loaded successfully. Size: {len(dataset)}", color="note")
         # colored_print(f"Size: {len(dataset)}", color="note")
         return dataset
     except Exception as e:
-        colored_print(f"[ERROR] Failed to prepare dataset: {str(e)}", color="red")
+        colored_print(f"[ERROR] Failed to load dataset: {str(e)}", color="red")
         exit(1)
 
 
@@ -102,12 +102,13 @@ def create_trainer(model, tokenizer, dataset):
         dataset_text_field="text",
         max_seq_length=SFTConfig.max_seq_length,
         dataset_num_proc=2,
-        packing=False,  # Can make training 5x faster for short sequences.
+        packing=SFTConfig.packing, 
         args=TrainingArguments(
             per_device_train_batch_size=SFTConfig.per_device_train_batch_size,
             gradient_accumulation_steps=SFTConfig.gradient_accumulation_steps,
             warmup_steps=SFTConfig.warmup_steps,
-            max_steps=SFTConfig.max_steps,
+            # max_steps=SFTConfig.max_steps,
+            num_train_epochs=SFTConfig.num_train_epochs,
             learning_rate=SFTConfig.learning_rate,
             fp16=not is_bfloat16_supported(),
             bf16=is_bfloat16_supported(),
@@ -118,14 +119,63 @@ def create_trainer(model, tokenizer, dataset):
             seed=SFTConfig.seed,
             output_dir=SFTConfig.output_dir,
             report_to=SFTConfig.report_to,
+            # save_steps=SFTConfig.save_steps,
+            # save_total_limit=SFTConfig.save_total_limit,
+            save_strategy=SFTConfig.save_strategy,
+            logging_dir=SFTConfig.log_dir,
+            log_level=SFTConfig.log_level,
         ),
     )
     colored_print("[INFO] SFTTrainer created successfully.", color="note")
     return trainer
-    # except Exception as e:
-    #     # colored_print(f"[ERROR] Failed to create SFTTrainer: {str(e)}", color="red")
-    #     colored_print(f"[ERROR] Failed to create SFTTrainer: {e}", color="red")
-    #     exit(1)
+
+
+def save_training_logs(trainer, output_dir):
+    """
+    保存训练日志和配置参数为 JSON 格式
+    """
+    colored_print(f"[INFO] Saving training logs to: {output_dir}", color="note")
+    try:
+        log_history = trainer.state.log_history
+        
+        # 保存完整日志历史
+        log_file = os.path.join(output_dir, "training_logs.json")
+        with open(log_file, 'w') as f:
+            json.dump(log_history, f, indent=2)
+        
+        # 保存训练指标总结
+        summary_file = os.path.join(output_dir, "training_summary.json")
+        summary = {
+            "total_steps": trainer.state.global_step,
+            "best_metric": trainer.state.best_metric,
+            "best_model_checkpoint": trainer.state.best_model_checkpoint,
+            "final_metrics": trainer.state.log_history[-1] if log_history else {}
+        }
+        with open(summary_file, 'w') as f:
+            json.dump(summary, f, indent=2)
+        
+        # 辅助函数：获取类的所有公共属性
+        def get_class_properties(cls):
+            properties = {}
+            for attr_name in dir(cls):
+                # 排除私有属性和方法
+                if not attr_name.startswith('_') and not callable(getattr(cls, attr_name)):
+                    properties[attr_name] = getattr(cls, attr_name)
+            return properties
+        
+        # 保存配置参数（自动获取所有配置类的属性）
+        config_file = os.path.join(output_dir, "config_params.json")
+        config_params = {
+            "GlobalConfig": get_class_properties(GlobalConfig),
+            "SFTConfig": get_class_properties(SFTConfig),
+            "ModelConfig": get_class_properties(ModelConfig),
+        }
+        with open(config_file, 'w') as f:
+            json.dump(config_params, f, indent=2, default=str)
+        
+        colored_print(f"[INFO] Training logs and config parameters saved successfully.", color="note")
+    except Exception as e:
+        colored_print(f"[ERROR] Failed to save training logs: {str(e)}", color="red")
 
 
 def show_gpu_stats():
@@ -165,7 +215,7 @@ def save_model(model, tokenizer, save_path=GlobalConfig.lora_dir):
     try:
         model.save_pretrained(save_path)  # Local saving
         tokenizer.save_pretrained(save_path)
-        colored_print(f"[INFO] Model saved successfully to {save_path}.", color="note")
+        colored_print(f"[INFO] Model saved successfully.", color="note")
     except Exception as e:
         colored_print(f"[ERROR] Failed to save model: {str(e)}", color="red")
 
@@ -178,7 +228,7 @@ def main():
     model = prepare_lora_model(model)
     
     # 准备数据集
-    dataset = prepare_dataset(tokenizer)
+    dataset = prepare_dataset(tokenizer, GlobalConfig.dataset_path)
     
     # 创建训练器
     trainer = create_trainer(model, tokenizer, dataset)
@@ -193,6 +243,9 @@ def main():
     
     # 显示训练统计信息
     show_training_stats(trainer_stats, start_gpu_memory, max_memory)
+    
+    # 保存训练日志
+    save_training_logs(trainer, SFTConfig.log_dir)
     
     # 保存模型
     save_model(model, tokenizer)
