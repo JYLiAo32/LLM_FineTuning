@@ -29,6 +29,7 @@ def load_base_model():
         exit(1)
 
 
+
 def prepare_lora_model(model):
     """
     load lora adapter
@@ -55,11 +56,12 @@ def prepare_lora_model(model):
         exit(1)
 
 
-def prepare_dataset(tokenizer, dataset_path: str):
+
+def prepare_dataset(tokenizer, train_path: str, val_path: str):
     """
-    prepare dataset for training
+    prepare dataset for training and validation
     """
-    colored_print(f"[INFO] Preparing dataset from: {dataset_path}...", color="note")
+    colored_print(f"[INFO] Preparing dataset from train: {train_path}, val: {val_path}...", color="note")
     
     prompt_template = PromptConfig.alpaca_prompt_domain_special2
 
@@ -78,27 +80,37 @@ def prepare_dataset(tokenizer, dataset_path: str):
         return { "text": texts, }
 
     try:
-        dataset = load_dataset(dataset_path, split="train")
-        # dataset, dataset_val  = load_dataset(dataset_path)  # TODO: 如何使用验证集
-        dataset = dataset.map(formatting_prompts_func, batched=True,)
-        colored_print(f"[INFO] Dataset loaded successfully. Size: {len(dataset)}", color="note")
-        # colored_print(f"Size: {len(dataset)}", color="note")
-        return dataset
+        # 加载训练集和验证集
+        # train_dataset = load_dataset("json", data_files=train_path, split="train")
+        # val_dataset = load_dataset("json", data_files=val_path, split="test")
+        dataset = load_dataset("json", data_files={"train": train_path, "validation": val_path})
+        train_dataset = dataset["train"]
+        val_dataset = dataset["validation"]
+        # 对训练集和验证集应用相同的格式化处理
+        train_dataset = train_dataset.map(formatting_prompts_func, batched=True,)
+        val_dataset = val_dataset.map(formatting_prompts_func, batched=True,)
+        
+        colored_print(f"[INFO] Dataset loaded successfully.", color="note")
+        colored_print(f"[INFO] Training set size: {len(train_dataset)}", color="note")
+        colored_print(f"[INFO] Validation set size: {len(val_dataset)}", color="note")
+        
+        return train_dataset, val_dataset
     except Exception as e:
         colored_print(f"[ERROR] Failed to load dataset: {str(e)}", color="red")
         exit(1)
 
 
-def create_trainer(model, tokenizer, dataset):
+
+def create_trainer(model, tokenizer, train_dataset, val_dataset):
     """
     创建SFTTrainer实例
     """
     colored_print("[INFO] Creating SFTTrainer...", color="note")
-    # try:
     trainer = SFTTrainer(
         model=model,
         tokenizer=tokenizer,
-        train_dataset=dataset,
+        train_dataset=train_dataset,
+        eval_dataset=val_dataset,
         dataset_text_field="text",
         max_seq_length=SFTConfig.max_seq_length,
         dataset_num_proc=2,
@@ -119,30 +131,46 @@ def create_trainer(model, tokenizer, dataset):
             seed=SFTConfig.seed,
             output_dir=SFTConfig.output_dir,
             report_to=SFTConfig.report_to,
-            # save_steps=SFTConfig.save_steps,
-            # save_total_limit=SFTConfig.save_total_limit,
             save_strategy=SFTConfig.save_strategy,
             logging_dir=SFTConfig.log_dir,
             log_level=SFTConfig.log_level,
+            # 验证相关配置
+            eval_steps=SFTConfig.eval_steps,  
+            eval_strategy=SFTConfig.evaluation_strategy,
         ),
     )
     colored_print("[INFO] SFTTrainer created successfully.", color="note")
     return trainer
 
 
+
 def save_training_logs(trainer, output_dir):
-    """
-    保存训练日志和配置参数为 JSON 格式
-    """
     colored_print(f"[INFO] Saving training logs to: {output_dir}", color="note")
     try:
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+
         log_history = trainer.state.log_history
-        
-        # 保存完整日志历史
-        log_file = os.path.join(output_dir, "training_logs.json")
-        with open(log_file, 'w') as f:
-            json.dump(log_history, f, indent=2)
-        
+
+        # 分类日志记录
+        train_records = [e for e in log_history if "loss" in e and "eval_loss" not in e]
+        eval_records = [e for e in log_history if "eval_loss" in e]
+
+        # 保存训练日志
+        train_file = os.path.join(output_dir, "train_metrics.json")
+        with open(train_file, "w") as f:
+            json.dump(train_records, f, indent=2)
+
+        # 保存评估日志
+        eval_file = os.path.join(output_dir, "eval_metrics.json")
+        with open(eval_file, "w") as f:
+            json.dump(eval_records, f, indent=2)
+
+        # # 保存完整日志历史
+        # full_log_file = os.path.join(output_dir, "training_logs_full.json")
+        # with open(full_log_file, "w") as f:
+        #     json.dump(log_history, f, indent=2)
+
         # 保存训练指标总结
         summary_file = os.path.join(output_dir, "training_summary.json")
         summary = {
@@ -151,31 +179,32 @@ def save_training_logs(trainer, output_dir):
             "best_model_checkpoint": trainer.state.best_model_checkpoint,
             "final_metrics": trainer.state.log_history[-1] if log_history else {}
         }
-        with open(summary_file, 'w') as f:
+        with open(summary_file, "w") as f:
             json.dump(summary, f, indent=2)
-        
-        # 辅助函数：获取类的所有公共属性
+
+        # 保存配置参数（与你已有保持一致）
         def get_class_properties(cls):
             properties = {}
             for attr_name in dir(cls):
-                # 排除私有属性和方法
                 if not attr_name.startswith('_') and not callable(getattr(cls, attr_name)):
                     properties[attr_name] = getattr(cls, attr_name)
             return properties
-        
-        # 保存配置参数（自动获取所有配置类的属性）
+
         config_file = os.path.join(output_dir, "config_params.json")
         config_params = {
             "GlobalConfig": get_class_properties(GlobalConfig),
             "SFTConfig": get_class_properties(SFTConfig),
             "ModelConfig": get_class_properties(ModelConfig),
         }
-        with open(config_file, 'w') as f:
+        with open(config_file, "w") as f:
             json.dump(config_params, f, indent=2, default=str)
-        
-        colored_print(f"[INFO] Training logs and config parameters saved successfully.", color="note")
+
+        colored_print("[INFO] Training logs and config parameters saved successfully.", color="note")
+
     except Exception as e:
         colored_print(f"[ERROR] Failed to save training logs: {str(e)}", color="red")
+
+
 
 
 def show_gpu_stats():
@@ -188,6 +217,7 @@ def show_gpu_stats():
     colored_print(f"[INFO] GPU = {gpu_stats.name}. Max memory = {max_memory} GB.", color="note")
     colored_print(f"[INFO] {start_gpu_memory} GB of memory reserved.", color="note")
     return start_gpu_memory, max_memory
+
 
 
 def show_training_stats(trainer_stats, start_gpu_memory, max_memory):
@@ -207,6 +237,7 @@ def show_training_stats(trainer_stats, start_gpu_memory, max_memory):
     colored_print(f"[INFO] Peak reserved memory for training % of max memory = {lora_percentage} %.", color="note")
 
 
+
 def save_model(model, tokenizer, save_path=GlobalConfig.lora_dir):
     """
     保存训练后的模型
@@ -220,6 +251,7 @@ def save_model(model, tokenizer, save_path=GlobalConfig.lora_dir):
         colored_print(f"[ERROR] Failed to save model: {str(e)}", color="red")
 
 
+
 def main():
     # 加载基础模型
     model, tokenizer = load_base_model()
@@ -227,11 +259,11 @@ def main():
     # 准备LoRA模型
     model = prepare_lora_model(model)
     
-    # 准备数据集
-    dataset = prepare_dataset(tokenizer, GlobalConfig.dataset_path)
+    # 准备数据集 (加载预拆分的训练集和验证集)
+    train_dataset, val_dataset = prepare_dataset(tokenizer, GlobalConfig.train_dataset_path, GlobalConfig.val_dataset_path)
     
     # 创建训练器
-    trainer = create_trainer(model, tokenizer, dataset)
+    trainer = create_trainer(model, tokenizer, train_dataset, val_dataset)
     
     # 显示GPU统计信息
     start_gpu_memory, max_memory = show_gpu_stats()
@@ -240,6 +272,12 @@ def main():
     colored_print("[INFO] Starting training...", color="note")
     trainer_stats = trainer.train()
     colored_print("[INFO] Training completed!", color="note")
+    
+    # 最后评估模型
+    colored_print("[INFO] Starting final evaluation...", color="note")
+    eval_results = trainer.evaluate()
+    colored_print(f"[INFO] Final evaluation results:", color="note")
+    print(eval_results)
     
     # 显示训练统计信息
     show_training_stats(trainer_stats, start_gpu_memory, max_memory)

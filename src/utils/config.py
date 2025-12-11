@@ -17,7 +17,14 @@ class GlobalConfig:
     # load_in_4bit = True
     lora_dir = os.path.join(timestamp_dir, "lora_model")
     
+    test_ratio = 0.1
     dataset_path = "./data/v1/"  # 需要包含数据集的目录
+    train_file_name = "train.json"
+    val_file_name = "val.json"
+    split_dir = os.path.join(dataset_path, "split")
+    train_dataset_path = os.path.join(split_dir, train_file_name)  # 训练集路径
+    val_dataset_path = os.path.join(split_dir, val_file_name)  # 验证集路径
+
 
 class SFTConfig(GlobalConfig):
     base_model_path = "/data/ljy/models/unsloth/Qwen2.5-7B-Instruct"
@@ -26,7 +33,7 @@ class SFTConfig(GlobalConfig):
     gradient_accumulation_steps = 2
     warmup_steps = 10 # 0.03
     # max_steps = 60 # 参数更新次数
-    num_train_epochs = 5 # 遍历数据集的次数
+    num_train_epochs = 2 # 5 # 遍历数据集的次数
     learning_rate = 1e-4
     logging_steps = 1
     optim = "adamw_8bit"
@@ -42,6 +49,9 @@ class SFTConfig(GlobalConfig):
     
     log_dir = os.path.join(timestamp_dir, "logs")
     log_level="info"
+    
+    eval_steps = 10 
+    evaluation_strategy = "steps"  # "steps" 或 "epoch"
     
 class ModelConfig:
     lora_r = 32  # Choose any number > 0 ! Suggested 8, 16, 32, 64, 128
