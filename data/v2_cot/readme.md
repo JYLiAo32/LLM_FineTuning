@@ -1,0 +1,2 @@
+基于md_format_clean2的文件构造
+input包含cot内容（由DeepSeek-R1在构造答案的过程生成）
