@@ -72,7 +72,7 @@ if __name__ == "__main__":
     import argparse
     
     parser = argparse.ArgumentParser(description="Split dataset into train and validation sets")
-    parser.add_argument("--input_file", type=str, default="./data/v1/dataset_v1.json",
+    parser.add_argument("--input_file", type=str, default="./data/v2/dataset_v2.json",
                         help="Input dataset file path")
     parser.add_argument("--output_dir", type=str, default=GlobalConfig.split_dir,
                         help="Output directory for split datasets")

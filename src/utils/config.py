@@ -1,13 +1,15 @@
 import datetime
 import os
 
+
 def _gen_lora_dir():
     current_time = datetime.datetime.now()
     timestamp = current_time.strftime("%y%m%d_%H%M%S")
-    # return f"./outputs/lora_model/{timestamp}/"
     return f"./outputs/{timestamp}/"
 
+
 timestamp_dir = _gen_lora_dir()
+
 
 class GlobalConfig:
     seed = 32
@@ -16,9 +18,9 @@ class GlobalConfig:
     load_in_4bit = False
     # load_in_4bit = True
     lora_dir = os.path.join(timestamp_dir, "lora_model")
-    
-    test_ratio = 0.1
-    dataset_path = "./data/v1/"  # 需要包含数据集的目录
+
+    test_ratio = 0.2
+    dataset_path = "./data/v2/"  # 需要包含数据集的目录
     train_file_name = "train.json"
     val_file_name = "val.json"
     split_dir = os.path.join(dataset_path, "split")
@@ -27,42 +29,56 @@ class GlobalConfig:
 
 
 class SFTConfig(GlobalConfig):
-    base_model_path = "/data/ljy/models/unsloth/Qwen2.5-7B-Instruct"
+    base_model_path = (
+        "/data/ljy/models/unsloth/Qwen2.5-7B-Instruct"  # TODO: 修改为实际的模型路径
+    )
     # TODO: 调优超参数, https://docs.unsloth.ai/get-started/fine-tuning-llms-guide/lora-hyperparameters-guide
     per_device_train_batch_size = 8
     gradient_accumulation_steps = 2
-    warmup_steps = 10 # 0.03
-    # max_steps = 60 # 参数更新次数
-    num_train_epochs = 2 # 5 # 遍历数据集的次数
-    learning_rate = 1e-4
+    warmup_steps = 10
+    learning_rate = 2e-4
     logging_steps = 1
-    optim = "adamw_8bit"
+    # optim = "adamw_torch" # "adamw_8bit"
     weight_decay = 0.01
     lr_scheduler_type = "linear"
     output_dir = os.path.join(timestamp_dir, "checkpoints")
-    report_to = "none"
+    report_to = "wandb"  # "tensorboard", "wandb" or "none"
     packing = True
-    
-    save_steps = 100  # 每 100 steps 保存一次 checkpoint
-    save_total_limit = 3  # 最多保存 3 个最新的 checkpoint
-    save_strategy = "epoch"  # "steps" 或 "epoch"
-    
+
     log_dir = os.path.join(timestamp_dir, "logs")
-    log_level="info"
-    
-    eval_steps = 10 
+    log_level = "info"
+
+    num_train_epochs = 4  #  For most instruction-based datasets, training for more than 3 epochs offers diminishing returns and increases the risk of overfitting.
+    save_total_limit = 20
+    save_strategy = "steps"  # "steps" 或 "epoch"
+    eval_steps = 5
     evaluation_strategy = "steps"  # "steps" 或 "epoch"
-    
+    save_steps = 25  # 每隔多少步保存一次模型
+
+    # 最佳模型选择配置
+    metric_for_best_model = "eval_loss"  # 使用验证损失作为评估指标
+    greater_is_better = False  # 对于loss指标，值越小越好
+    load_best_model_at_end = True  # 训练结束时加载最佳模型
+
+
 class ModelConfig:
     lora_r = 32  # Choose any number > 0 ! Suggested 8, 16, 32, 64, 128
-    lora_alpha = 64  # 喜欢设置alpha是rank的2倍，其实可以二者1: 1跑
+    lora_alpha = lora_r * 2  # 喜欢设置alpha是rank的2倍，其实可以二者1: 1跑
     lora_dropout = 0  # Supports any, but = 0 is optimized
-    target_modules = ["q_proj", "k_proj", "v_proj", "o_proj",
-                      "up_proj", "down_proj", "gate_proj"]
-    bias="none"  # Supports any, but = "none" is optimized
+    target_modules = [
+        "q_proj",
+        "k_proj",
+        "v_proj",
+        "o_proj",
+        "up_proj",
+        "down_proj",
+        "gate_proj",
+    ]
+    bias = "none"  # Supports any, but = "none" is optimized
+
 
 class InferenceConfig(GlobalConfig):
-    DEFAULT_MAX_NEW_TOKENS = 512
+    DEFAULT_MAX_NEW_TOKENS = GlobalConfig.max_seq_length
     DEFAULT_TEMPERATURE = 0.2
     DEFAULT_TOP_P = 0.85
 
@@ -92,14 +108,14 @@ class PromptConfig:
     """
     alpaca_prompt_domain_special2 = """你是一名专门负责居民身份证相关业务的政务服务助手。针对用户提问，请遵循以下规范进行答复：
     1. 解答内容必须基于居民身份证办理的官方政策，不得编造或杜撰规定。
-    2. 回答应当简洁准确、清晰规范，避免口语化表达。
+    2. 回答应当简洁准确且清晰规范。
     3. 如用户提问与居民身份证业务无关，请礼貌说明并避免提供不确定的信息。
     ### 用户提问
     {instruction}
     ### 答复
     {output}
     """
-    
+
 
 if __name__ == "__main__":
     print(SFTConfig.lora_dir)

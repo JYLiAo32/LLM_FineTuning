@@ -210,3 +210,5 @@ unsloth_compiled_cache/*
 .vscode/launch.json
 lora_model/*
 archived/*
+wandb/*
+data/v1_debug/*

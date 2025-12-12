@@ -14,7 +14,9 @@ def load_base_model():
     """
     load base model and tokenizer
     """
-    colored_print(f"[INFO] Loading base model from: {SFTConfig.base_model_path}", color="note")
+    colored_print(
+        f"[INFO] Loading base model from: {SFTConfig.base_model_path}", color="note"
+    )
     try:
         model, tokenizer = FastLanguageModel.from_pretrained(
             model_name=SFTConfig.base_model_path,
@@ -29,7 +31,6 @@ def load_base_model():
         exit(1)
 
 
-
 def prepare_lora_model(model):
     """
     load lora adapter
@@ -38,11 +39,11 @@ def prepare_lora_model(model):
     try:
         model = FastLanguageModel.get_peft_model(
             model,
-            r=ModelConfig.lora_r,  
+            r=ModelConfig.lora_r,
             target_modules=ModelConfig.target_modules,
             lora_alpha=ModelConfig.lora_alpha,
-            lora_dropout=ModelConfig.lora_dropout,  
-            bias=ModelConfig.bias,    
+            lora_dropout=ModelConfig.lora_dropout,
+            bias=ModelConfig.bias,
             # [NEW] "unsloth" uses 30% less VRAM, fits 2x larger batch sizes!
             use_gradient_checkpointing="unsloth",  # True or "unsloth" for very long context
             random_state=GlobalConfig.seed,
@@ -56,17 +57,19 @@ def prepare_lora_model(model):
         exit(1)
 
 
-
 def prepare_dataset(tokenizer, train_path: str, val_path: str):
     """
     prepare dataset for training and validation
     """
-    colored_print(f"[INFO] Preparing dataset from train: {train_path}, val: {val_path}...", color="note")
-    
+    colored_print(
+        f"[INFO] Preparing dataset from train: {train_path}, val: {val_path}...",
+        color="note",
+    )
+
     prompt_template = PromptConfig.alpaca_prompt_domain_special2
 
     EOS_TOKEN = tokenizer.eos_token  # Must add EOS_TOKEN
-    
+
     def formatting_prompts_func(examples):
         instructions = examples["instruction"]
         inputs = examples["input"]
@@ -75,30 +78,52 @@ def prepare_dataset(tokenizer, train_path: str, val_path: str):
         for instruction, input, output in zip(instructions, inputs, outputs):
             # Must add EOS_TOKEN, otherwise your generation will go on forever!
             # text = prompt_template.format(instruction=instruction, input=input, output=output) + EOS_TOKEN
-            text = prompt_template.format(instruction=instruction, output=output) + EOS_TOKEN
+            text = (
+                prompt_template.format(instruction=instruction, output=output)
+                + EOS_TOKEN
+            )
             texts.append(text)
-        return { "text": texts, }
+        return {
+            "text": texts,
+        }
 
     try:
         # 加载训练集和验证集
         # train_dataset = load_dataset("json", data_files=train_path, split="train")
         # val_dataset = load_dataset("json", data_files=val_path, split="test")
-        dataset = load_dataset("json", data_files={"train": train_path, "validation": val_path})
+        dataset = load_dataset(
+            "json", data_files={"train": train_path, "validation": val_path}
+        )
         train_dataset = dataset["train"]
         val_dataset = dataset["validation"]
         # 对训练集和验证集应用相同的格式化处理
-        train_dataset = train_dataset.map(formatting_prompts_func, batched=True,)
-        val_dataset = val_dataset.map(formatting_prompts_func, batched=True,)
-        
+        train_dataset = train_dataset.map(
+            formatting_prompts_func,
+            batched=True,
+        )
+        val_dataset = val_dataset.map(
+            formatting_prompts_func,
+            batched=True,
+        )
+
+        # 删除原有的列，保留处理后的"text"列，规避一些不必要的日志输出
+        for name in ["instruction", "input", "output", "system"]:
+            if name in train_dataset.column_names:
+                train_dataset = train_dataset.remove_columns(name)
+            if name in val_dataset.column_names:
+                val_dataset = val_dataset.remove_columns(name)
+
+        # train_dataset = train_dataset.remove_columns(["instruction", "input", "output", "system"])
+        # val_dataset = val_dataset.remove_columns(["instruction", "input", "output", "system"])
+
         colored_print(f"[INFO] Dataset loaded successfully.", color="note")
         colored_print(f"[INFO] Training set size: {len(train_dataset)}", color="note")
         colored_print(f"[INFO] Validation set size: {len(val_dataset)}", color="note")
-        
+
         return train_dataset, val_dataset
     except Exception as e:
         colored_print(f"[ERROR] Failed to load dataset: {str(e)}", color="red")
         exit(1)
-
 
 
 def create_trainer(model, tokenizer, train_dataset, val_dataset):
@@ -114,10 +139,10 @@ def create_trainer(model, tokenizer, train_dataset, val_dataset):
         dataset_text_field="text",
         max_seq_length=SFTConfig.max_seq_length,
         dataset_num_proc=2,
-        packing=SFTConfig.packing, 
+        packing=SFTConfig.packing,
         args=TrainingArguments(
-            per_device_train_batch_size=SFTConfig.per_device_train_batch_size,
-            gradient_accumulation_steps=SFTConfig.gradient_accumulation_steps,
+            per_device_train_batch_size=SFTConfig.per_device_train_batch_size,  # 8
+            gradient_accumulation_steps=SFTConfig.gradient_accumulation_steps,  # 2
             warmup_steps=SFTConfig.warmup_steps,
             # max_steps=SFTConfig.max_steps,
             num_train_epochs=SFTConfig.num_train_epochs,
@@ -125,26 +150,30 @@ def create_trainer(model, tokenizer, train_dataset, val_dataset):
             fp16=not is_bfloat16_supported(),
             bf16=is_bfloat16_supported(),
             logging_steps=SFTConfig.logging_steps,
-            optim=SFTConfig.optim,
+            # optim=SFTConfig.optim,  # 使用默认的adamw_torch_fused (for torch>2.8)
             weight_decay=SFTConfig.weight_decay,
             lr_scheduler_type=SFTConfig.lr_scheduler_type,
             seed=SFTConfig.seed,
             output_dir=SFTConfig.output_dir,
             report_to=SFTConfig.report_to,
-            save_strategy=SFTConfig.save_strategy,
             logging_dir=SFTConfig.log_dir,
             log_level=SFTConfig.log_level,
-            # 验证相关配置
-            eval_steps=SFTConfig.eval_steps,  
+            save_strategy=SFTConfig.save_strategy,
+            save_total_limit=SFTConfig.save_total_limit,
+            save_steps=SFTConfig.save_steps,
+            eval_steps=SFTConfig.eval_steps,
             eval_strategy=SFTConfig.evaluation_strategy,
+            # 最佳模型选择配置
+            metric_for_best_model=SFTConfig.metric_for_best_model,
+            greater_is_better=SFTConfig.greater_is_better,
+            load_best_model_at_end=SFTConfig.load_best_model_at_end,
         ),
     )
     colored_print("[INFO] SFTTrainer created successfully.", color="note")
     return trainer
 
 
-
-def save_training_logs(trainer, output_dir):
+def save_training_logs(trainer, trainer_stats, output_dir):
     colored_print(f"[INFO] Saving training logs to: {output_dir}", color="note")
     try:
         if not os.path.exists(output_dir):
@@ -177,16 +206,19 @@ def save_training_logs(trainer, output_dir):
             "total_steps": trainer.state.global_step,
             "best_metric": trainer.state.best_metric,
             "best_model_checkpoint": trainer.state.best_model_checkpoint,
-            "final_metrics": trainer.state.log_history[-1] if log_history else {}
+            "final_metrics": trainer.state.log_history[-1] if log_history else {},
+            "trainer_stats": trainer_stats,
         }
         with open(summary_file, "w") as f:
             json.dump(summary, f, indent=2)
 
-        # 保存配置参数（与你已有保持一致）
+        # 保存配置参数
         def get_class_properties(cls):
             properties = {}
             for attr_name in dir(cls):
-                if not attr_name.startswith('_') and not callable(getattr(cls, attr_name)):
+                if not attr_name.startswith("_") and not callable(
+                    getattr(cls, attr_name)
+                ):
                     properties[attr_name] = getattr(cls, attr_name)
             return properties
 
@@ -199,12 +231,13 @@ def save_training_logs(trainer, output_dir):
         with open(config_file, "w") as f:
             json.dump(config_params, f, indent=2, default=str)
 
-        colored_print("[INFO] Training logs and config parameters saved successfully.", color="note")
+        colored_print(
+            "[INFO] Training logs and config parameters saved successfully.",
+            color="note",
+        )
 
     except Exception as e:
         colored_print(f"[ERROR] Failed to save training logs: {str(e)}", color="red")
-
-
 
 
 def show_gpu_stats():
@@ -214,10 +247,11 @@ def show_gpu_stats():
     gpu_stats = torch.cuda.get_device_properties(0)
     start_gpu_memory = round(torch.cuda.max_memory_reserved() / 1024 / 1024 / 1024, 3)
     max_memory = round(gpu_stats.total_memory / 1024 / 1024 / 1024, 3)
-    colored_print(f"[INFO] GPU = {gpu_stats.name}. Max memory = {max_memory} GB.", color="note")
+    colored_print(
+        f"[INFO] GPU = {gpu_stats.name}. Max memory = {max_memory} GB.", color="note"
+    )
     colored_print(f"[INFO] {start_gpu_memory} GB of memory reserved.", color="note")
     return start_gpu_memory, max_memory
-
 
 
 def show_training_stats(trainer_stats, start_gpu_memory, max_memory):
@@ -228,14 +262,28 @@ def show_training_stats(trainer_stats, start_gpu_memory, max_memory):
     used_memory_for_lora = round(used_memory - start_gpu_memory, 3)
     used_percentage = round(used_memory / max_memory * 100, 3)
     lora_percentage = round(used_memory_for_lora / max_memory * 100, 3)
-    
-    colored_print(f"[INFO] {trainer_stats.metrics['train_runtime']} seconds used for training.", color="note")
-    colored_print(f"[INFO] {round(trainer_stats.metrics['train_runtime'] / 60, 2)} minutes used for training.", color="note")
-    colored_print(f"[INFO] Peak reserved memory = {used_memory} GB.", color="note")
-    colored_print(f"[INFO] Peak reserved memory for training = {used_memory_for_lora} GB.", color="note")
-    colored_print(f"[INFO] Peak reserved memory % of max memory = {used_percentage} %.", color="note")
-    colored_print(f"[INFO] Peak reserved memory for training % of max memory = {lora_percentage} %.", color="note")
 
+    colored_print(
+        f"[INFO] {trainer_stats.metrics['train_runtime']} seconds used for training.",
+        color="note",
+    )
+    colored_print(
+        f"[INFO] {round(trainer_stats.metrics['train_runtime'] / 60, 2)} minutes used for training.",
+        color="note",
+    )
+    colored_print(f"[INFO] Peak reserved memory = {used_memory} GB.", color="note")
+    colored_print(
+        f"[INFO] Peak reserved memory for training = {used_memory_for_lora} GB.",
+        color="note",
+    )
+    colored_print(
+        f"[INFO] Peak reserved memory % of max memory = {used_percentage} %.",
+        color="note",
+    )
+    colored_print(
+        f"[INFO] Peak reserved memory for training % of max memory = {lora_percentage} %.",
+        color="note",
+    )
 
 
 def save_model(model, tokenizer, save_path=GlobalConfig.lora_dir):
@@ -251,58 +299,92 @@ def save_model(model, tokenizer, save_path=GlobalConfig.lora_dir):
         colored_print(f"[ERROR] Failed to save model: {str(e)}", color="red")
 
 
+def evaluate_best_model(trainer):
+    """
+    评估最佳模型
+    """
+    assert (
+        SFTConfig.load_best_model_at_end
+    ), "load_best_model_at_end must be True to evaluate the best model."
+    colored_print("[INFO] Starting evaluation for best model...", color="note")
+    eval_results = trainer.evaluate()
+    colored_print(f"[INFO] Evaluation results:", color="note")
+    colored_print(eval_results, color="note")
+    # 保存评估结果到文件
+    eval_file = os.path.join(SFTConfig.log_dir, "best_model_eval.json")
+    eval_results["best_model_checkpoint"] = trainer.state.best_model_checkpoint
+    with open(eval_file, "w") as f:
+        json.dump(eval_results, f, indent=2)
+    return eval_results
+
 
 def main():
     # 加载基础模型
     model, tokenizer = load_base_model()
-    
+
     # 准备LoRA模型
     model = prepare_lora_model(model)
-    
+
     # 准备数据集 (加载预拆分的训练集和验证集)
-    train_dataset, val_dataset = prepare_dataset(tokenizer, GlobalConfig.train_dataset_path, GlobalConfig.val_dataset_path)
-    
+    train_dataset, val_dataset = prepare_dataset(
+        tokenizer, GlobalConfig.train_dataset_path, GlobalConfig.val_dataset_path
+    )
+
     # 创建训练器
     trainer = create_trainer(model, tokenizer, train_dataset, val_dataset)
-    
+
     # 显示GPU统计信息
     start_gpu_memory, max_memory = show_gpu_stats()
-    
+
     # 训练模型
     colored_print("[INFO] Starting training...", color="note")
     trainer_stats = trainer.train()
     colored_print("[INFO] Training completed!", color="note")
-    
-    # 最后评估模型
-    colored_print("[INFO] Starting final evaluation...", color="note")
-    eval_results = trainer.evaluate()
-    colored_print(f"[INFO] Final evaluation results:", color="note")
-    print(eval_results)
-    
+
     # 显示训练统计信息
     show_training_stats(trainer_stats, start_gpu_memory, max_memory)
-    
+
     # 保存训练日志
-    save_training_logs(trainer, SFTConfig.log_dir)
-    
+    save_training_logs(trainer, trainer_stats, SFTConfig.log_dir)
+
+    # # 评估最佳模型
+    # 与wandb模式不兼容
+    # evaluate_best_model(trainer)
+
     # 保存模型
-    save_model(model, tokenizer)
+    # 结合load_best_model_at_end = True，保存最佳模型
+    save_model(trainer.model, tokenizer)
+
+    colored_print("[INFO] All done!", color="note")
 
 
 if __name__ == "__main__":
     import argparse
-    
+
     parser = argparse.ArgumentParser(description="LoRA Fine-tuning Script")
-    parser.add_argument("--base_model", type=str, default=None,
-                        help="Base model path (overrides config)")
-    parser.add_argument("--output_dir", type=str, default=None,
-                        help="Output directory (overrides config)")
-    parser.add_argument("--max_steps", type=int, default=None,
-                        help="Maximum training steps (overrides config)")
-    parser.add_argument("--batch_size", type=int, default=None,
-                        help="Batch size (overrides config)")
+    parser.add_argument(
+        "--base_model",
+        type=str,
+        default=None,
+        help="Base model path (overrides config)",
+    )
+    parser.add_argument(
+        "--output_dir",
+        type=str,
+        default=None,
+        help="Output directory (overrides config)",
+    )
+    parser.add_argument(
+        "--max_steps",
+        type=int,
+        default=None,
+        help="Maximum training steps (overrides config)",
+    )
+    parser.add_argument(
+        "--batch_size", type=int, default=None, help="Batch size (overrides config)"
+    )
     args = parser.parse_args()
-    
+
     if args.base_model:
         SFTConfig.base_model_path = args.base_model
     if args.output_dir:
@@ -311,5 +393,5 @@ if __name__ == "__main__":
         SFTConfig.max_steps = args.max_steps
     if args.batch_size:
         SFTConfig.per_device_train_batch_size = args.batch_size
-    
+
     main()
