@@ -13,7 +13,7 @@ timestamp_dir = _gen_lora_dir()
 
 class GlobalConfig:
     seed = 32
-    max_seq_length = 2048
+    max_seq_length = 1024
     dtype = None  # None -> auto, or torch.float16 / torch.bfloat16 etc.
     load_in_4bit = False
     # load_in_4bit = True
@@ -48,12 +48,12 @@ class SFTConfig(GlobalConfig):
     log_dir = os.path.join(timestamp_dir, "logs")
     log_level = "info"
 
-    num_train_epochs = 4  #  For most instruction-based datasets, training for more than 3 epochs offers diminishing returns and increases the risk of overfitting.
-    save_total_limit = 20
+    num_train_epochs = 6  #  For most instruction-based datasets, training for more than 3 epochs offers diminishing returns and increases the risk of overfitting.
+    save_total_limit = 30
     save_strategy = "steps"  # "steps" 或 "epoch"
     eval_steps = 5
     evaluation_strategy = "steps"  # "steps" 或 "epoch"
-    save_steps = 25  # 每隔多少步保存一次模型
+    save_steps = 50  # 每隔多少步保存一次模型
 
     # 最佳模型选择配置
     metric_for_best_model = "eval_loss"  # 使用验证损失作为评估指标
@@ -62,7 +62,7 @@ class SFTConfig(GlobalConfig):
 
 
 class ModelConfig:
-    lora_r = 32  # Choose any number > 0 ! Suggested 8, 16, 32, 64, 128
+    lora_r = 128  # Choose any number > 0 ! Suggested 8, 16, 32, 64, 128
     lora_alpha = lora_r * 2  # 喜欢设置alpha是rank的2倍，其实可以二者1: 1跑
     lora_dropout = 0  # Supports any, but = 0 is optimized
     target_modules = [

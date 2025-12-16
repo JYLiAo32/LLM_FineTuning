@@ -11,7 +11,7 @@ def generate_text(model, tokenizer, prompt_text: str, max_new_tokens: int, tempe
     inputs = tokenizer([prompt_text], return_tensors="pt", padding=True)
     inputs = {k: v.to(device) for k, v in inputs.items()}
 
-    if stream and not args.no_stream:
+    if stream:
         text_streamer = TextStreamer(tokenizer, skip_prompt=True, skip_special_tokens=True)
         _ = model.generate(
             **inputs,
@@ -103,7 +103,6 @@ if __name__ == "__main__":
     parser.add_argument("--max_new_tokens", type=int, default=None)
     parser.add_argument("--temperature", type=float, default=None)
     parser.add_argument("--top_p", type=float, default=None)
-    parser.add_argument("--no_stream", action="store_true")
     args = parser.parse_args()
     
     # 如果提供了命令行参数，则覆盖配置

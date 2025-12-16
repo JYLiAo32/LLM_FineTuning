@@ -7,3 +7,5 @@ trl>=0.8.0
 accelerate>=0.27.0
 colorama>=0.4.6
 scipy>=1.10.0
+evaluate>=0.4.6
+bert_score>=0.3.13

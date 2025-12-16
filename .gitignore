@@ -212,3 +212,5 @@ lora_model/*
 archived/*
 wandb/*
 data/v1_debug/*
+src/test.py
+results/*

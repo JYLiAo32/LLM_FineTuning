@@ -1,0 +1,50 @@
+{
+  "dataset_path": "data/v2/dataset_v2.json",
+  "model_path": "/data/ljy/models/unsloth/Qwen2.5-7B-Instruct",
+  "total_answers": 2277,
+  "max_tokens": 996,
+  "min_tokens": 5,
+  "avg_tokens": 100.58146684233641,
+  "median_tokens": 77,
+  "stdev_tokens": 85.54073361878977,
+  "avg_char_token_ratio": 1.660334723495545,
+  "token_length_distribution": {
+    "bins": [
+      "0-50",
+      "51-100",
+      "101-200",
+      "201-300",
+      "301-500",
+      "501-1000",
+      "1001-2000",
+      ">2000"
+    ],
+    "counts": [
+      623,
+      846,
+      588,
+      147,
+      58,
+      15,
+      0,
+      0
+    ],
+    "percentages": [
+      27.360562143170842,
+      37.15415019762846,
+      25.823451910408433,
+      6.455862977602108,
+      2.547211242863417,
+      0.6587615283267457,
+      0.0,
+      0.0
+    ]
+  },
+  "suggested_max_new_tokens": 1195,
+  "buffer_calculation": {
+    "max_tokens": 996,
+    "buffer_percentage": 20,
+    "buffer_minimum": 50,
+    "buffer_used": 199
+  }
+}
