@@ -151,7 +151,7 @@ def main():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate evaluation data for multiple models sequentially")
     parser.add_argument("--exp_name", type=str, default='251212_172211', help="Experiment name for output directory")
-    parser.add_argument("--dataset_path", type=str, help="Path to evaluation dataset JSON file")
+    parser.add_argument("--dataset_path", type=str, default='data/v2/dataset_v2.json', help="Path to evaluation dataset JSON file")
     parser.add_argument("--output_path", type=str, help="Path to save output JSON file (supports append)")
     parser.add_argument("--model_path", type=str, help="Path to the current model being evaluated")
     parser.add_argument("--checkpoint", type=str, default=None, help="Checkpoint identifier for the current model")
@@ -166,10 +166,10 @@ if __name__ == "__main__":
     ##################
     # args.checkpoint = None # '550' or '200' or None
     ##########
-    args.model_field = f'sft_{args.checkpoint}'
-    args.dataset_path = f'data/v2/dataset_v2.json'
-    # args.dataset_path = f'data/v1_debug/split/val.json'
-    args.output_path = f'results/{args.exp_name}/answer.json'
+    # args.model_field = f'sft_{args.checkpoint}'
+    # args.dataset_path = f'data/v2/dataset_v2.json'
+    # # args.dataset_path = f'data/v1_debug/split/val.json'
+    # args.output_path = f'results/{args.exp_name}/answer.json'
     
     if args.checkpoint is None:
         args.model_field = 'base_model'

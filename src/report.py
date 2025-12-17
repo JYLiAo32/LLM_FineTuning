@@ -3,8 +3,8 @@ import os
 from tabulate import tabulate
 
 
-# metric_file_name = "answer_val_eval"
-metric_file_name = "answer_eval"
+metric_file_name = "answer_val_eval"
+# metric_file_name = "answer_eval"
 
 # 1. Mapping from experiment group names to file paths
 experiment_mapping = {
