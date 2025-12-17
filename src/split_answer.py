@@ -109,7 +109,7 @@ if __name__ == "__main__":
     # 解析参数
     args = parser.parse_args()
     ###################
-    args.answer_path = f'results/251212_172211_550/answer.json'
+    # args.answer_path = f'results/251212_172211_550/answer.json'
     ###################
     
     

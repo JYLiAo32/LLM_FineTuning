@@ -122,29 +122,41 @@ def main():
         colored_print(f"[ERROR] Failed to load answer file: {str(e)}", color="red")
         return
     
-    # Extract data
+    # Extract reference texts (output field)
     references = [item['output'] for item in data]
-    base_predictions = [item['base_answer'] for item in data]
-    sft_predictions = [item['sft_answer'] for item in data]
     
-    # Evaluate base model
-    colored_print("[INFO] Evaluating base model...", color="note")
-    base_results = evaluate_model(base_predictions, references, metrics, args.model_name)
+    # Identify model fields (all fields except 'instruction' and 'output')
+    if data:
+        # Get all keys from the first item
+        all_fields = list(data[0].keys())
+        # Filter out instruction and output fields to get model fields
+        model_fields = [field for field in all_fields if field not in ['instruction', 'output']]
+        
+        if not model_fields:
+            colored_print("[ERROR] No model output fields found in the answer file", color="red")
+            return
+        colored_print(f"[INFO] Found model fields to evaluate: {', '.join(model_fields)}", color="note")
+    else:
+        colored_print("[ERROR] Answer file is empty", color="red")
+        return
     
-    # Evaluate fine-tuned model
-    colored_print("[INFO] Evaluating fine-tuned model...", color="note")
-    sft_results = evaluate_model(sft_predictions, references, metrics, args.model_name)
+    # Evaluate all model fields
+    evaluation_results = {}
+    for model_field in model_fields:
+        colored_print(f"[INFO] Evaluating {model_field}...", color="note")
+        try:
+            predictions = [item[model_field] for item in data]
+            results = evaluate_model(predictions, references, metrics, args.model_name)
+            evaluation_results[model_field] = results
+            
+            # Print results for current model
+            print_evaluation_results(results, model_field)
+        except Exception as e:
+            colored_print(f"[ERROR] Failed to evaluate {model_field}: {str(e)}", color="red")
+            continue
     
-    # Print evaluation results
-    print_evaluation_results(base_results, "Base Model")
-    print_evaluation_results(sft_results, "Fine-tuned Model")
-    
-    # Save evaluation results
-    results = {
-        'base_model': base_results,
-        'fine_tuned_model': sft_results
-    }
-    save_evaluation_results(results, args.output_path)
+    # Save all evaluation results
+    save_evaluation_results(evaluation_results, args.output_path)
     
     colored_print("\n[INFO] Evaluation completed!", color="note")
 
@@ -158,7 +170,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     ###################
-    # args.answer_path = f'results/251212_172211_550/answer_train.json'
-    # args.answer_path = f'results/251212_172211_200/answer_train.json'
+    # args.answer_path = f'results/251212_172211/answer.json'
     ###################
     main()
