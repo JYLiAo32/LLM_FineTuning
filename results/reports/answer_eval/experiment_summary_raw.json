@@ -1,0 +1,83 @@
+[
+  {
+    "experiment": "251216_174056_LoRA16",
+    "model": "sft_200",
+    "rouge_rougeL": 0.08028290452532881,
+    "bleu_bleu": 0.10360649106544448,
+    "bertscore_precision": 0.795283016453828,
+    "bertscore_recall": 0.7926695024333714,
+    "bertscore_f1": 0.7907882775190267
+  },
+  {
+    "experiment": "251216_174056_LoRA16",
+    "model": "sft_550",
+    "rouge_rougeL": 0.1311525973416619,
+    "bleu_bleu": 0.1841154808117712,
+    "bertscore_precision": 0.8793722723050761,
+    "bertscore_recall": 0.8669029735634083,
+    "bertscore_f1": 0.8708898035460101
+  },
+  {
+    "experiment": "251212_172211_LoRA32",
+    "model": "base_model",
+    "rouge_rougeL": 0.0698326359647539,
+    "bleu_bleu": 0.03575978743177894,
+    "bertscore_precision": 0.6781495192436257,
+    "bertscore_recall": 0.7390629513566307,
+    "bertscore_f1": 0.7046179428245082
+  },
+  {
+    "experiment": "251212_172211_LoRA32",
+    "model": "sft_200",
+    "rouge_rougeL": 0.11091588602579526,
+    "bleu_bleu": 0.12597476063151156,
+    "bertscore_precision": 0.8014435756347867,
+    "bertscore_recall": 0.7999896648085112,
+    "bertscore_f1": 0.7973784406325458
+  },
+  {
+    "experiment": "251212_172211_LoRA32",
+    "model": "sft_550",
+    "rouge_rougeL": 0.1832542445355358,
+    "bleu_bleu": 0.39124955960611246,
+    "bertscore_precision": 0.9081920923032831,
+    "bertscore_recall": 0.9092276020692952,
+    "bertscore_f1": 0.9073512437420034
+  },
+  {
+    "experiment": "251216_145427_LoRA64",
+    "model": "sft_200",
+    "rouge_rougeL": 0.136510451244428,
+    "bleu_bleu": 0.13853883798128172,
+    "bertscore_precision": 0.8051863742544821,
+    "bertscore_recall": 0.8110348696922283,
+    "bertscore_f1": 0.8048304283519455
+  },
+  {
+    "experiment": "251216_145427_LoRA64",
+    "model": "sft_550",
+    "rouge_rougeL": 0.2026693205066143,
+    "bleu_bleu": 0.459953593689132,
+    "bertscore_precision": 0.930112590876702,
+    "bertscore_recall": 0.9188635675960536,
+    "bertscore_f1": 0.9230671886503565
+  },
+  {
+    "experiment": "251216_161739_LoRA128",
+    "model": "sft_200",
+    "rouge_rougeL": 0.1468274233824881,
+    "bleu_bleu": 0.1532774194240291,
+    "bertscore_precision": 0.7821956800037588,
+    "bertscore_recall": 0.8312131224570696,
+    "bertscore_f1": 0.8031308011077819
+  },
+  {
+    "experiment": "251216_161739_LoRA128",
+    "model": "sft_550",
+    "rouge_rougeL": 0.22370081573367637,
+    "bleu_bleu": 0.5640123235667502,
+    "bertscore_precision": 0.9357787149356654,
+    "bertscore_recall": 0.935015927098747,
+    "bertscore_f1": 0.9342989398818504
+  }
+]

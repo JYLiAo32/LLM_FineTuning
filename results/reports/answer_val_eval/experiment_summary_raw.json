@@ -1,0 +1,83 @@
+[
+  {
+    "experiment": "251216_174056_LoRA16",
+    "model": "sft_200",
+    "rouge_rougeL": 0.08925383859012179,
+    "bleu_bleu": 0.10422357484676588,
+    "bertscore_precision": 0.7797676467262538,
+    "bertscore_recall": 0.7810080282192314,
+    "bertscore_f1": 0.7766903608509924
+  },
+  {
+    "experiment": "251216_174056_LoRA16",
+    "model": "sft_550",
+    "rouge_rougeL": 0.08161385689040554,
+    "bleu_bleu": 0.08040481893418008,
+    "bertscore_precision": 0.7916692467653645,
+    "bertscore_recall": 0.7866554585969554,
+    "bertscore_f1": 0.7856034252759629
+  },
+  {
+    "experiment": "251212_172211_LoRA32",
+    "model": "base_model",
+    "rouge_rougeL": 0.08178573822932231,
+    "bleu_bleu": 0.03470764982949232,
+    "bertscore_precision": 0.6797191902863241,
+    "bertscore_recall": 0.7403578055379665,
+    "bertscore_f1": 0.7060284793904398
+  },
+  {
+    "experiment": "251212_172211_LoRA32",
+    "model": "sft_200",
+    "rouge_rougeL": 0.10892378270696852,
+    "bleu_bleu": 0.12165865097683297,
+    "bertscore_precision": 0.7779354534845436,
+    "bertscore_recall": 0.7839450390465492,
+    "bertscore_f1": 0.7771865567274853
+  },
+  {
+    "experiment": "251212_172211_LoRA32",
+    "model": "sft_550",
+    "rouge_rougeL": 0.0926362661429033,
+    "bleu_bleu": 0.09551834926930858,
+    "bertscore_precision": 0.7867805402627034,
+    "bertscore_recall": 0.7959684391992282,
+    "bertscore_f1": 0.7881520836226708
+  },
+  {
+    "experiment": "251216_145427_LoRA64",
+    "model": "sft_200",
+    "rouge_rougeL": 0.12824108045346977,
+    "bleu_bleu": 0.12849054848225672,
+    "bertscore_precision": 0.7777765079409675,
+    "bertscore_recall": 0.7891616329418875,
+    "bertscore_f1": 0.7795724885917343
+  },
+  {
+    "experiment": "251216_145427_LoRA64",
+    "model": "sft_550",
+    "rouge_rougeL": 0.10784384617349216,
+    "bleu_bleu": 0.08732182065153404,
+    "bertscore_precision": 0.8029263980884468,
+    "bertscore_recall": 0.7913189448614036,
+    "bertscore_f1": 0.7936484540722012
+  },
+  {
+    "experiment": "251216_161739_LoRA128",
+    "model": "sft_200",
+    "rouge_rougeL": 0.12276525891830412,
+    "bleu_bleu": 0.11738448650483474,
+    "bertscore_precision": 0.7485971733004646,
+    "bertscore_recall": 0.8023410254875115,
+    "bertscore_f1": 0.7717175047218272
+  },
+  {
+    "experiment": "251216_161739_LoRA128",
+    "model": "sft_550",
+    "rouge_rougeL": 0.09842980238282162,
+    "bleu_bleu": 0.09007588130969364,
+    "bertscore_precision": 0.7939900472364595,
+    "bertscore_recall": 0.8004588239488348,
+    "bertscore_f1": 0.7939948612346058
+  }
+]
